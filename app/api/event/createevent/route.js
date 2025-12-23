@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Event from '@/models/event.model';
 import { v2 as cloudinary } from 'cloudinary';
+import connectDB from '@/utils/db';
 
 export const runtime = 'nodejs'
 
@@ -22,11 +23,17 @@ export async function POST(request) {
             }, { status: 400 });
         }
 
+        // Connect to DB
+        await connectDB();
+
         const image_urls = [];
         if (images && Array.isArray(images) && images.length > 0) {
             for (const image of images) {
                 try {
-                    const result = await cloudinary.uploader.upload(image);
+                    const result = await cloudinary.uploader.upload(image, {
+                        resource_type: 'auto',
+                        folder: 'sportwave/events'
+                    });
                     image_urls.push(result.secure_url);
                 } catch (uploadError) {
                     console.error('Image upload error:', uploadError);
@@ -39,7 +46,7 @@ export async function POST(request) {
             description,
             location,
             sport,
-            date,
+            date: new Date(date), // Convert ISO string to Date object
             time: time || '',
             price: price || 0,
             image_urls: image_urls,
@@ -59,9 +66,14 @@ export async function POST(request) {
             return NextResponse.json({ error: "Failed to create event" }, { status: 500 });
         }
         
-        return NextResponse.json({ message: "Event created successfully", event: event }, { status: 200 });
+        return NextResponse.json({ 
+            message: "Event created successfully", 
+            event: event 
+        }, { status: 200 });
     } catch (error) {
         console.error('Create event error:', error);
-        return NextResponse.json({ error: error.message || "Failed to create event" }, { status: 500 });
+        return NextResponse.json({ 
+            error: error.message || "Failed to create event" 
+        }, { status: 500 });
     }
 }

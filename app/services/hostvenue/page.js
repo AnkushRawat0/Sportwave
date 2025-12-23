@@ -20,37 +20,71 @@ const CreateEventPage = () => {
         name: '',
         description: '',
         sport: '',
-        location: '',
+        location: location || '',
         date: '',
         time: '',
         price: '',
         NoOfSeats: '',
         images: [],
-        pin: '',
+        pin: pinCode || '',
         detailedLocation: '',
-        lat: '',
-        lng: '',
+        lat: lat || '',
+        lng: lng || '',
         isActive: true
-
     })
 
-    // Update form data when store values change
+    // Update form data when store values change - only update if values changed
     useEffect(() => {
-        setFormData(prev => ({
-            ...prev,
-            location: location || '',
-            pin: pinCode || '',
-            lat: lat || '',
-            lng: lng || ''
-        }))
-    }, [location, pinCode])
+        if (location && formData.location !== location) {
+            setFormData(prev => ({
+                ...prev,
+                location: location
+            }))
+        }
+        if (pinCode && formData.pin !== pinCode) {
+            setFormData(prev => ({
+                ...prev,
+                pin: pinCode
+            }))
+        }
+        if (lat && formData.lat !== lat) {
+            setFormData(prev => ({
+                ...prev,
+                lat: lat
+            }))
+        }
+        if (lng && formData.lng !== lng) {
+            setFormData(prev => ({
+                ...prev,
+                lng: lng
+            }))
+        }
+    }, [location, pinCode, lat, lng, formData.location, formData.pin, formData.lat, formData.lng])
 
     const { mutate: createEvent, isPending } = useCustomMutation('/api/event/createevent', {
         onSuccess: (data) => {
-            // Optionally, reset form or redirect
+            // Reset form on success
+            setFormData({
+                name: '',
+                description: '',
+                sport: '',
+                location: location || '',
+                date: '',
+                time: '',
+                price: '',
+                NoOfSeats: '',
+                images: [],
+                pin: pinCode || '',
+                detailedLocation: '',
+                lat: lat || '',
+                lng: lng || '',
+                isActive: true
+            });
+            alert('Event created successfully!');
         },
         onError: (error) => {
             console.error('Error creating event:', error);
+            alert('Failed to create event: ' + error.message);
         },
     })
 
@@ -90,42 +124,33 @@ const CreateEventPage = () => {
     const handleSubmit = (e) => {
         e.preventDefault()
 
+        // Validate required fields
+        if (!formData.name || !formData.description || !formData.sport || !formData.location || !formData.date || !formData.NoOfSeats || !formData.pin) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
         // Prepare the data for the API
         const eventData = {
-            name: formData.name,
-            description: formData.description,
+            name: formData.name.trim(),
+            description: formData.description.trim(),
             sport: formData.sport,
-            location: formData.location,
-            date: formData.date,
-            time: formData.time,
+            location: formData.location.trim(),
+            date: new Date(formData.date).toISOString(),
+            time: formData.time || '',
             price: parseFloat(formData.price) || 0,
             NoOfSeats: parseInt(formData.NoOfSeats),
             images: formData.images,
             players: [],
             host: user._id,
             isActive: true,
-            pin: formData.pin,
-            detailedLocation: formData.detailedLocation,
-            lat: lat,
-            lng: lng
+            pin: formData.pin.trim(),
+            detailedLocation: formData.detailedLocation.trim(),
+            lat: parseFloat(lat) || 0,
+            lng: parseFloat(lng) || 0
         }
 
         createEvent(eventData)
-
-        // Reset form on success
-        setFormData({
-            name: '',
-            description: '',
-            sport: '',
-            location: location || '',
-            date: '',
-            time: '',
-            price: '',
-            NoOfSeats: '',
-            images: [],
-            pin: pinCode || '',
-            detailedLocation: ''
-        })
     }
 
     return (

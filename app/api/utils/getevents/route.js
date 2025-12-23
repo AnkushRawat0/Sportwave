@@ -6,8 +6,6 @@ export const runtime = 'nodejs'
 
 
 export async function GET(request) {
-
-
     function getDistanceInKm(lat1, lon1, lat2, lon2) {
         const R = 6371; // Radius of the Earth in km
         const dLat = (lat2 - lat1) * (Math.PI / 180);
@@ -28,51 +26,74 @@ export async function GET(request) {
     const time = searchParams.get('time');
     const price = searchParams.get('price');
     const NoOfSeats = searchParams.get('NoOfSeats');
-    const isActive = searchParams.get('isActive');
+    const isActive = searchParams.get('isActive') || 'true';
     const search = searchParams.get('search');
     const lat = searchParams.get('lat');
     const lng = searchParams.get('lng');
-    const radius = searchParams.get('radius') || 50; // Default radius is 50 km
+    const radius = searchParams.get('radius') || 50;
+    const page = parseInt(searchParams.get('page')) || 1;
+    const limit = parseInt(searchParams.get('limit')) || 20;
+
     try {
         await connectDB();
-        let events = await Event.find({
 
-        });
         if (!lat || !lng) {
-            return NextResponse.json({ error: 'Latitude and Longitude are required for location-based search' }, { status: 400 });
+            return NextResponse.json({ error: 'Latitude and Longitude are required' }, { status: 400 });
         }
-        if (lat && lng) {
-            events = events.filter(event => {
-                const distance = getDistanceInKm(lat, lng, event.lat, event.lng);
-                return distance <= radius // Filter events within 50 km
-            });
-        }
+
+        // Build MongoDB query for database-level filtering
+        const query = { isActive: true };
+
+        if (sport) query.sport = new RegExp(sport, 'i');
+        if (location) query.location = new RegExp(location, 'i');
+        if (date) query.date = date;
+        if (time) query.time = time;
+        if (price) query.price = { $lte: price };
+        if (NoOfSeats) query.NoOfSeats = { $gte: NoOfSeats };
+
+        // Use lean() for faster queries (returns plain JS objects, not Mongoose documents)
+        let events = await Event.find(query)
+            .lean()
+            .limit(limit * 2) // Fetch more to account for distance filtering
+            .select('_id name description sport location date time price NoOfSeats lat lng players');
+
+        // Apply distance filtering in memory (more efficient after DB filtering)
+        events = events.filter(event => {
+            const distance = getDistanceInKm(parseFloat(lat), parseFloat(lng), event.lat, event.lng);
+            return distance <= radius;
+        });
+
+        // Apply search filter if provided
         if (search) {
-            events = events.filter(event => event.name.toLowerCase().includes(search.toLowerCase()) || event.description.toLowerCase().includes(search.toLowerCase()) || event.location.toLowerCase().includes(search.toLowerCase()) || event.sport.toLowerCase().includes(search.toLowerCase()));
+            const searchLower = search.toLowerCase();
+            events = events.filter(event =>
+                event.name?.toLowerCase().includes(searchLower) ||
+                event.description?.toLowerCase().includes(searchLower) ||
+                event.location?.toLowerCase().includes(searchLower) ||
+                event.sport?.toLowerCase().includes(searchLower)
+            );
         }
-        if (price) {
-            events = events.filter(event => event.price <= price);
-        }
-        if (NoOfSeats) {
-            events = events.filter(event => event.NoOfSeats >= NoOfSeats);
-        }
-        if (isActive) {
-            events = events.filter(event => event.isActive === isActive);
-        }
-        if (sport) {
-            events = events.filter(event => event.sport.toLowerCase().includes(sport.toLowerCase()));
-        }
-        if (location) {
-            events = events.filter(event => event.location.toLowerCase().includes(location.toLowerCase()));
-        }
-        if (date) {
-            events = events.filter(event => event.date === date);
-        }
-        if (time) {
-            events = events.filter(event => event.time === time);
-        }
-        return NextResponse.json({ events });
+
+        // Pagination
+        const skip = (page - 1) * limit;
+        const paginatedEvents = events.slice(skip, skip + limit);
+        const total = events.length;
+
+        return NextResponse.json({
+            events: paginatedEvents,
+            pagination: {
+                total,
+                page,
+                limit,
+                pages: Math.ceil(total / limit)
+            }
+        }, {
+            headers: {
+                'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120'
+            }
+        });
     } catch (error) {
+        console.error('Get events error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 } 
