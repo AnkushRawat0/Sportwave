@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import User from '@/models/user.model';
 import connectDB from '@/utils/db';
 
-export const GET = async (req: Request) => {
+export const runtime = 'nodejs'
+
+export const GET = async (req) => {
     try {
         await connectDB();
 
@@ -14,7 +16,7 @@ export const GET = async (req: Request) => {
         const maxAge = searchParams.get('maxAge');
         
         // Build the filter object
-        const filter: any = {};
+        const filter = {};
 
         // Filter by sport type (case-insensitive)
         if (sportType) {
@@ -33,7 +35,7 @@ export const GET = async (req: Request) => {
 
         // Filter by age range (only if exact age is not provided)
         if (!age && ((minAge && !isNaN(parseInt(minAge))) || (maxAge && !isNaN(parseInt(maxAge))))) {
-            const ageFilter: any = {};
+            const ageFilter = {};
             if (minAge && !isNaN(parseInt(minAge))) {
                 ageFilter.$gte = parseInt(minAge);
             }
@@ -45,6 +47,7 @@ export const GET = async (req: Request) => {
 
         const users = await User.find(filter)
             .select('-password -__v')
+            .lean()
             .sort({ createdAt: -1 });
 
         return NextResponse.json({
@@ -58,6 +61,10 @@ export const GET = async (req: Request) => {
                 minAge: minAge,
                 maxAge: maxAge
             }
+        }, {
+            headers: {
+                'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120'
+            }
         });
 
     } catch (error) {
@@ -66,7 +73,7 @@ export const GET = async (req: Request) => {
             {
                 success: false,
                 error: 'Failed to fetch users',
-                message: error instanceof Error ? error.message : 'Unknown error'
+                message: error.message || 'Unknown error'
             },
             { status: 500 }
         );

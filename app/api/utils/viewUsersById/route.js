@@ -4,7 +4,7 @@ import connectDB from '@/utils/db';
 
 export const runtime = 'nodejs'
 
-export const GET = async (req: Request) => {
+export const GET = async (req) => {
     try {
         await connectDB();
 
@@ -38,6 +38,10 @@ export const GET = async (req: Request) => {
         return NextResponse.json({
             success: true,
             data: user
+        }, {
+            headers: {
+                'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120'
+            }
         });
 
     } catch (error) {
@@ -46,7 +50,7 @@ export const GET = async (req: Request) => {
             {
                 success: false,
                 error: 'Failed to fetch user',
-                message: error instanceof Error ? error.message : 'Unknown error'
+                message: error.message || 'Unknown error'
             },
             { status: 500 }
         );
