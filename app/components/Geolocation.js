@@ -7,7 +7,7 @@ import { useStore } from '@/zustand/store';
 export default function AutoLocationButton() {
   const [location, setLocation] = useState(null);
   const [loading, setLoading] = useState(false);
-  const lastFetchTimeRef = useRef(null); // For throttling
+  const lastFetchTimeRef = useRef(null);
   const { setLat, setLng } = useStore();
 
   const mapUrl = location
@@ -16,25 +16,37 @@ export default function AutoLocationButton() {
 
   const { data: mapData, isLoading, error } = useCustomQuery(mapUrl);
 
-  // 🔹 Auto-fetch on first render only
+  // Auto-fetch on first render with fallback
   useEffect(() => {
-    if (navigator.geolocation) {
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
           setLocation({ lat: latitude, lng: longitude });
           setLat(latitude);
           setLng(longitude);
-          // console.log('Auto-location fetched:', { lat: latitude, lng: longitude });
         },
         (error) => {
-          console.error('Auto-location error:', error);
+          console.warn('Geolocation failed, using default location:', error);
+          // Fallback to center of India
+          const defaultLat = 20.5937;
+          const defaultLng = 78.9629;
+          setLocation({ lat: defaultLat, lng: defaultLng });
+          setLat(defaultLat);
+          setLng(defaultLng);
         }
       );
+    } else {
+      // Browser doesn't support geolocation, use default
+      const defaultLat = 20.5937;
+      const defaultLng = 78.9629;
+      setLocation({ lat: defaultLat, lng: defaultLng });
+      setLat(defaultLat);
+      setLng(defaultLng);
     }
-  }, []); // Run once only
+  }, []);
 
-  // 🔹 Manual fetch with 10s throttling
+  // Manual fetch with 10s throttling
   const findLocation = () => {
     const now = Date.now();
     if (lastFetchTimeRef.current && now - lastFetchTimeRef.current < 10000) {
@@ -45,20 +57,36 @@ export default function AutoLocationButton() {
     lastFetchTimeRef.current = now;
     setLoading(true);
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setLocation({ lat: latitude, lng: longitude });
-        setLat(latitude);
-        setLng(longitude);
-        setLoading(false);
-      },
-      (error) => {
-        alert('Unable to retrieve your location');
-        setLoading(false);
-        console.error(error);
-      }
-    );
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setLocation({ lat: latitude, lng: longitude });
+          setLat(latitude);
+          setLng(longitude);
+          setLoading(false);
+        },
+        (error) => {
+          alert('Unable to retrieve your location. Using default location.');
+          console.error('Geolocation error:', error);
+          // Use default location
+          const defaultLat = 20.5937;
+          const defaultLng = 78.9629;
+          setLocation({ lat: defaultLat, lng: defaultLng });
+          setLat(defaultLat);
+          setLng(defaultLng);
+          setLoading(false);
+        }
+      );
+    } else {
+      alert('Geolocation not supported. Using default location.');
+      const defaultLat = 20.5937;
+      const defaultLng = 78.9629;
+      setLocation({ lat: defaultLat, lng: defaultLng });
+      setLat(defaultLat);
+      setLng(defaultLng);
+      setLoading(false);
+    }
   };
 
   return (
@@ -67,6 +95,7 @@ export default function AutoLocationButton() {
         <button
           onClick={findLocation}
           className="bg-blue-500 text-white px-3 py-3 rounded-full shadow hover:bg-green-600 transition flex items-center gap-2"
+          disabled={loading}
         >
           <FaLocationDot />
         </button>
@@ -80,7 +109,7 @@ export default function AutoLocationButton() {
 
       {location && !isLoading && !error && (
         <div className="mt-2 text-sm text-gray-700">
-          Location: {mapData?.address?.city || mapData?.address?.town || mapData?.address?.village || mapData?.address?.state || mapData?.address?.country}
+          Location: {mapData?.address?.city || mapData?.address?.town || mapData?.address?.village || mapData?.address?.state || mapData?.address?.country || 'India'}
         </div>
       )}
 
