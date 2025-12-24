@@ -5,33 +5,50 @@ import AutoLocationButton from '@/app/components/Geolocation';
 import { useStore } from '@/zustand/store';
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from 'next/navigation';
-
-
-
-
+import { useEffect } from 'react';
 
 const page = () => {
 
-  const { lat, lng } = useStore()
+  const { lat, lng, setLat, setLng } = useStore()
   const router = useRouter();
-
+  const [mounted, setMounted] = React.useState(false);
   const [searchResults1, setSearchResults] = React.useState('');
   const [sport, setSport] = React.useState('');
   const [radius, setRadius] = React.useState(50); // Default radius is 50 km
   const [sortType, setSortType] = React.useState('date'); // Default sort type is date
+  const [localLat, setLocalLat] = React.useState(lat);
+  const [localLng, setLocalLng] = React.useState(lng);
 
-  const { data: searchResults, isError, error } = useQuery({
-    queryKey: ['searchEvents', lat, lng, searchResults1, sport, radius],
+  // Set default location on mount if geolocation fails
+  useEffect(() => {
+    setMounted(true);
+    if (!lat || !lng) {
+      // Default to center of India if no location found
+      setLocalLat(20.5937);
+      setLocalLng(78.9629);
+      setLat(20.5937);
+      setLng(78.9629);
+    } else {
+      setLocalLat(lat);
+      setLocalLng(lng);
+    }
+  }, [lat, lng, setLat, setLng]);
+
+  const { data: searchResults, isError, error, isLoading } = useQuery({
+    queryKey: ['searchEvents', localLat, localLng, searchResults1, sport, radius],
     queryFn: async () => {
-      const response = await fetch(`/api/utils/getevents?lat=${lat}&lng=${lng}&search=${searchResults1}&sport=${sport}&radius=${radius}`, {
+      if (!localLat || !localLng) {
+        throw new Error('Location not available');
+      }
+      const response = await fetch(`/api/utils/getevents?lat=${localLat}&lng=${localLng}&search=${searchResults1}&sport=${sport}&radius=${radius}`, {
         method: 'GET',
       });
       if (!response.ok) {
-        throw new Error('Network response was not ok');
+        throw new Error('Failed to fetch events');
       }
       return response.json();
     },
-    enabled: !!lat && !!lng, // Only run the query if lat and lng are available
+    enabled: !!localLat && !!localLng && mounted, // Only run when location is available and mounted
   });
 
   const handleSearch = (searchValue) => {
@@ -43,6 +60,14 @@ const page = () => {
     setRadius(radiusValue);
   }
 
+  if (!mounted) {
+    return (
+      <div className="bg-gray-100 min-h-screen flex items-center justify-center">
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-gray-100 min-h-screen">
       {/* Search Bar */}
@@ -52,7 +77,23 @@ const page = () => {
 
       {/* Event Results Section */}
       <div className="pt-32 px-4">
-        {searchResults?.events && searchResults.events.length > 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
+            <p className="text-gray-500 text-lg">Loading events...</p>
+          </div>
+        ) : isError ? (
+          <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
+            <div className="text-center">
+              <p className="text-red-500 text-lg mb-4">Error loading events: {error?.message}</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        ) : searchResults?.events && searchResults.events.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {searchResults.events
               .filter(event => event._id)
