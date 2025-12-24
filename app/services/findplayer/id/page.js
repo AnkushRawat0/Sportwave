@@ -1,11 +1,11 @@
 'use client';
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import api from '@/api';
 import Spinner from '@/app/components/Spinner';
 
-export default function UserProfile() {
+function UserProfileContent() {
   const searchParams = useSearchParams();
   const userId = searchParams.get('userId');
 
@@ -114,5 +114,17 @@ export default function UserProfile() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function UserProfile() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center items-center min-h-screen">
+        <Spinner />
+      </div>
+    }>
+      <UserProfileContent />
+    </Suspense>
   );
 }

@@ -26,10 +26,6 @@ const userSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-// Add indexes for better query performance
-userSchema.index({ email: 1 });
-userSchema.index({ google_id: 1 });
-
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 
 export default User;

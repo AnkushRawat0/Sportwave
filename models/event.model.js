@@ -10,7 +10,7 @@ const eventSchema = new mongoose.Schema({
     detailedLocation: { type: String, required: false },
     price: { type: Number, required: false },
     image_urls: { type: Array, required: false },
-    host: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    host: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     players: { type: [mongoose.Schema.Types.ObjectId], ref: 'User', required: false, default: [] },
     NoOfSeats: { type: Number, required: true },
     isActive: { type: Boolean, required: true, default: true, index: true },
@@ -31,7 +31,6 @@ const eventSchema = new mongoose.Schema({
 eventSchema.index({ sport: 1, date: 1 });
 eventSchema.index({ isActive: 1, date: 1 });
 eventSchema.index({ pin: 1, isActive: 1 });
-eventSchema.index({ host: 1 });
 
 const Event = mongoose.models.Event || mongoose.model("Event", eventSchema);
 
